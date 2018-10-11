@@ -20,8 +20,13 @@ from barrier_field import views
 
 urlpatterns = [
     path('register/', views.Register.as_view(), name='register'),
+    path('register-complete/', views.RegistrationComplete.as_view(),
+         name='registration-complete'),
+    path('confirm-user/', views.ConfirmUser.as_view(),
+         name='confirm-user'),
     path('update/', views.Update.as_view(), name='update'),
     path('login/', views.CognitoLogIn.as_view(), name='cognito-login'),
+    #path('user-comfirm/', views.UserComfirm.as_view(), name='user-comfirm'),
     path('logout/', views.CognitoLogOut.as_view(), name='cognito-logout'),
 
     # AUTHORISED MFA SETTINGS

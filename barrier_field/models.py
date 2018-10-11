@@ -1,17 +1,15 @@
 import logging
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from swapper import swappable_setting, get_model_name
+import swapper
 
 from barrier_field.client import cognito
-from barrier_field.utils import get_attr_map, \
-    get_custom_attrs_from_options, get_user_data_model, is_enabled, \
-    get_user_data_model_fields
+from barrier_field.utils import (get_attr_map, get_custom_attrs_from_options,
+                                 get_user_data_model, is_enabled, get_user_data_model_fields)
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +20,21 @@ class BaseUserData(models.Model):
         abstract = True
 
 
-# Child
+class UserData(BaseUserData):
+    class Meta:
+        swappable = swapper.swappable_setting('barrier_field', 'UserData')
+
+
 class User(AbstractUser):
     """
     Extend base django user to include phone number, which is required by
     cognito
     """
     phone_number = models.CharField(max_length=50, blank=True)
-    user_data_model = settings.BARRIER_FIELD_USERDATA_MODEL
-    user_data_model_name = user_data_model.split('.')[-1]
     user_data = models.ForeignKey(
-        get_model_name('barrier_field', user_data_model_name),
-        on_delete=models.CASCADE
+        swapper.get_model_name('barrier_field', 'UserData'),
+        on_delete=models.CASCADE, blank=True, null=True
     )
-
-    class Meta:
-        swappable = swappable_setting('barrier_field', 'User')
 
     def sync_cognito(self, include_custom=False):
         user_data = self.__dict__

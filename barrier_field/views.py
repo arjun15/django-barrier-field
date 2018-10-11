@@ -2,11 +2,12 @@ import os
 
 from django.conf import settings
 from django.contrib import messages
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import authenticate, logout
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
-from django.urls import reverse
+from django.urls import (reverse, reverse_lazy)
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import FormView, TemplateView
@@ -16,9 +17,19 @@ from barrier_field import forms
 from barrier_field.backend import register, complete_login, barrier_field_login
 from barrier_field.client import cognito
 from barrier_field.exceptions import MFARequiredSMS, MFARequiredSoftware, \
-    MFAMismatch, CognitoInvalidPassword
+    MFAMismatch, CognitoInvalidPassword, UserNotConfirmed
 from barrier_field.utils import get_user_model, generate_and_save_qr_code, \
     verify_user_email
+
+
+class RegistrationComplete(TemplateView, ):
+    template_name = 'barrier_field/registration_complete.html'
+    title = _('Registration complete')
+
+
+class ConfirmUser(TemplateView, ):
+    template_name = 'barrier_field/confirm_user.html'
+    title = _('Confirm User')
 
 
 class CognitoLogIn(LoginView):
@@ -40,8 +51,10 @@ class CognitoLogIn(LoginView):
             return redirect(reverse('sms-mfa'))
         except MFARequiredSoftware:
             return redirect(reverse('software-mfa'))
+        except UserNotConfirmed:
+            return redirect(reverse('confirm-user'))
         else:
-            return HttpResponseRedirect(self.get_success_url())
+            return HttpResponseRedirect('/')
 
 
 class CognitoLogOut(LogoutView):
@@ -65,25 +78,23 @@ class CognitoLogOut(LogoutView):
 class Register(FormView):
     template_name = 'registration/register.html'
     form_class = forms.UserCreateForm
-    success_url = '/'
+    #success_url = '/'
+    success_url = reverse_lazy('registration-complete')
 
     def form_valid(self, form):
         user_model = get_user_model()
         create_user = {
             'username': form.cleaned_data['username'],
             'password': form.cleaned_data['password1'],
-            'is_superuser': form.cleaned_data['is_superuser'],
-            'is_staff': form.cleaned_data['is_staff']
+            'is_superuser': False,
+            'is_staff': False,
+            'email': form.cleaned_data['email']
         }
 
         # Register with cognito
         register(self.request, create_user)
         user_model.objects.create_user(**create_user)
-        new_user = authenticate(
-            username=create_user['username'],
-            password=create_user['password']
-        )
-        barrier_field_login(self.request, new_user)
+
         return super(Register, self).form_valid(form)
 
 
@@ -226,7 +237,7 @@ class SetSoftwareMFA(FormView):
         response = cognito.associate_software_token(self.request)
         secret_code = response['SecretCode']
         OTP = f'otpauth://totp/Username:{self.request.user.username}' \
-              f'?secret={secret_code}&issuer=BoughtByMany'
+            f'?secret={secret_code}&issuer=BoughtByMany'
         save_location = generate_and_save_qr_code(self. request, OTP)
         context['qr_code'] = save_location.replace('static/', '')
         context['token_code'] = secret_code

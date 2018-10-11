@@ -29,6 +29,10 @@ class CognitoInvalidPassword(Exception):
     pass
 
 
+class UserNotConfirmed(Exception):
+    pass
+
+
 catch_login_exceptions = (
-    MFARequiredSMS, MFARequiredSoftware, ForceChangePasswordException
+    MFARequiredSMS, MFARequiredSoftware, ForceChangePasswordException, UserNotConfirmed
 )

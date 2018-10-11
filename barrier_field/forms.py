@@ -4,6 +4,7 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm, \
     AuthenticationForm
 
 from barrier_field.exceptions import catch_login_exceptions
+from barrier_field.models import User
 
 
 class LoginForm(AuthenticationForm):
@@ -89,8 +90,10 @@ class PasswordChangeForm(PasswordUpdateForm):
 
 
 class UserCreateForm(UserCreationForm):
-    is_superuser = forms.BooleanField(required=False)
-    is_staff = forms.BooleanField(required=False)
+
+    class Meta:
+        model = User
+        fields = ('email', 'username', 'phone_number')
 
 
 class UserUpdateform(UserChangeForm):

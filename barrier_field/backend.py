@@ -8,6 +8,7 @@ from barrier_field.utils import get_attr_map, get_user_data_model_fields, \
 
 
 def register(request, new_user):
+
     pool_id = settings.COGNITO_USER_POOL_ID
     app_id = settings.COGNITO_APP_ID
     cog = Cognito(pool_id, app_id)
@@ -56,7 +57,7 @@ class CognitoAuth:
             # Validate authentication
             cognito.verify_token(
                 cognito_auth['AuthenticationResult']['IdToken'],
-                'id_token','id'
+                'id_token', 'id'
             )
             cognito.verify_token(
                 cognito_auth['AuthenticationResult']['AccessToken'],
