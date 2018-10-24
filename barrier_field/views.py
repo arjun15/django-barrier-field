@@ -3,7 +3,7 @@ import os
 from django.conf import settings
 from django.contrib import messages
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth import authenticate, logout
+from django.contrib.auth import authenticate, logout, login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
@@ -37,13 +37,15 @@ class CognitoLogIn(LoginView):
 
     def form_valid(self, form):
         try:
-            self.request.session['login_data'] = self.request.POST
             user = authenticate(
                 self.request,
                 username=form.cleaned_data['username'],
                 password=form.cleaned_data['password']
             )
+
             barrier_field_login(self.request, user)
+            self.request.session['login_data'] = self.request.POST
+
         except ForceChangePasswordException:
             # New user must change their temporary password
             return redirect(reverse('force-change-password'))
@@ -54,7 +56,7 @@ class CognitoLogIn(LoginView):
         except UserNotConfirmed:
             return redirect(reverse('confirm-user'))
         else:
-            return HttpResponseRedirect('/')
+            return HttpResponseRedirect(self.get_success_url())
 
 
 class CognitoLogOut(LogoutView):
@@ -71,20 +73,19 @@ class CognitoLogOut(LogoutView):
         next_page = self.get_next_page()
         if next_page:
             # Redirect to this page until the session has been cleared.
-            return HttpResponseRedirect(next_page)
+            return HttpResponseRedirect('/')
         return super().dispatch(request, *args, **kwargs)
 
 
 class Register(FormView):
     template_name = 'registration/register.html'
     form_class = forms.UserCreateForm
-    #success_url = '/'
     success_url = reverse_lazy('registration-complete')
 
     def form_valid(self, form):
         user_model = get_user_model()
         create_user = {
-            'username': form.cleaned_data['username'],
+            'username': form.cleaned_data['email'],
             'password': form.cleaned_data['password1'],
             'is_superuser': False,
             'is_staff': False,
@@ -123,6 +124,7 @@ class ForceChangePassword(FormView):
         login_form_data = self.request.session.get('login_data')
         current_password = login_form_data.get('password')
         new_password = form.cleaned_data['password1']
+
         try:
             # Username can drop off cognito session, if it does, add it back on
             if not cognito.username:
@@ -155,8 +157,12 @@ class ChangePassword(FormView):
 
     def form_valid(self, form):
         current_password = form.cleaned_data['current_password']
-        new_password = form.cleaned_data['new_password1']
+        new_password = form.cleaned_data['password1']
+        user_model = get_user_model()
+        db_user = user_model.objects.get(username=self.request.user.username)
         try:
+            db_user.set_password(new_password)
+            db_user.save()
             cognito.change_password(current_password, new_password)
         except Exception as e:
             try:
@@ -329,15 +335,19 @@ class ForgotPasswordConfirm(FormView):
         email_address = form.cleaned_data['email_address']
         verification_code = form.cleaned_data['verification_code']
         new_password = form.cleaned_data['password2']
-
+        user_model = get_user_model()
+        db_user = user_model.objects.get(username=email_address)
         cognito.username = email_address
         try:
+            db_user.set_password(new_password)
+            db_user.save()
             response = cognito.confirm_forgot_password(
                 verification_code, new_password
             )
+
         except Exception as ex:
             form.add_error(
                 field='verification_code',
-                error=f'Something went wrong: {ex} ->  Resp: {response}'
+                error=f'Something went wrong: {ex} ->  Resp:'
             )
         return redirect(reverse('cognito-login'))

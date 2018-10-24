@@ -87,12 +87,12 @@ def barrier_field_login(request, user):
     """
     Remove temporary session context data (stored for MFA login completion)
     """
-    request.session.pop('login_data')
+    # request.session.pop('login_data')
     login(request, user)
 
 
 def complete_login(request, auth_response):
-    login_data = request.session.pop('login_data')
+    #login_data = request.session.pop('login_data')
     user = authenticate(
         request, username=login_data['username'], cognito_auth=auth_response
     )

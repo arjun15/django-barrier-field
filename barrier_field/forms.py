@@ -93,7 +93,7 @@ class UserCreateForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'phone_number')
+        fields = ('email', 'phone_number')
 
 
 class UserUpdateform(UserChangeForm):
